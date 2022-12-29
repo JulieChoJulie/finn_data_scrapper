@@ -5,13 +5,14 @@ import json
 import sys
 import traceback
 import os
-import parser
-from parser import YahooDriver
+import scrapper
+import logging
+from scrapper import YahooDriver
 
 with open('data/stock_US.json', 'r') as fp:
     stock_list = [{"currency": "USD", "description": "CARVANA CO", "displaySymbol": "CVNA", "symbol": "CVNA", "type": "EQS"}]
     # json.load(fp)
-print("# of symbols: {}".format(len(stock_list)))
+logging.info("# of symbols: {}".format(len(stock_list)))
 
 import threading, queue
 import time
@@ -32,9 +33,9 @@ class Worker(threading.Thread):
         self.name = name
 
     def run(self):
-        print ("Starting " + self.name)
+        logging.info("Starting " + self.name)
         run_worker(self.name)
-        print ("Exiting " + self.name)
+        logging.info("Exiting " + self.name)
 
 
 def run_worker(threadName):
@@ -42,17 +43,17 @@ def run_worker(threadName):
     try:
         # while True:
         while not q.empty():
-            print(f"Approximate queue size: {q.qsize()}")
+            logging.info(f"Approximate queue size: {q.qsize()}")
             start_time = time.time()
             item = None
             try:
                 item = q.get_nowait()
-                print(f"Stock to process: {item}")
+                logging.info(f"Stock to process: {item}")
                 driver.process(item)
                 if exitFlag:
                     threadName.exit()
                 end_time = time.time()
-                print(f"Process time {end_time - start_time}")
+                logging.info(f"Process time {end_time - start_time}")
                 # time.sleep(0.5)
             except queue.Empty:
                 pass
@@ -60,8 +61,8 @@ def run_worker(threadName):
                 e = sys.exc_info()[0]
                 e_message = sys.exc_info()[1]
                 e_stacktrace = sys.exc_info()[2]
-                print(f"**** Failed with exception for {item}: {e} {e_message} {e_stacktrace}")
-                print(e_stacktrace)
+                logging.warning(f"**** Failed with exception for {item}: {e} {e_message} {e_stacktrace}")
+                logging.warning(e_stacktrace)
                 traceback.print_exc()
     finally:
         driver.quit()
@@ -80,5 +81,5 @@ for thread in thread_pool:
     thread.join()
 
 global_end_time = time.time()
-print(f"Total execution time {global_end_time - global_init_time}")
-print("Exiting Main Thread")
+logging.info(f"Total execution time {global_end_time - global_init_time}")
+logging.info("Exiting Main Thread")

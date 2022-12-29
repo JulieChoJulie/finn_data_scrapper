@@ -1,73 +1,19 @@
 import pandas as pd
 from bs4 import BeautifulSoup
 from seleniumwire import webdriver
-# from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-import requests
-import json
 import sys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from fake_useragent import UserAgent
-import random
 import traceback
 import os
 import time
 import threading
-
-
-class AtomicInteger(object):
-    def __init__(self, value=0):
-        self._value = value
-        self._lock = threading.Lock()
-
-    def inc(self):
-        with self._lock:
-            self._value += 1
-            return self._value
-
-    def dec(self):
-        with self._lock:
-            self._value -= 1
-            return self._value
-
-    @property
-    def value(self):
-        with self._lock:
-            return self._value
-
-    @value.setter
-    def value(self, v):
-        with self._lock:
-            self._value = v
-
-
-class AtomicDouble(object):
-    def __init__(self, value=0.0):
-        self._value = value
-        self._lock = threading.Lock()
-
-    def inc(self):
-        with self._lock:
-            self._value += 1
-            return self._value
-
-    def dec(self):
-        with self._lock:
-            self._value -= 1
-            return self._value
-
-    @property
-    def value(self):
-        with self._lock:
-            return self._value
-
-    @value.setter
-    def value(self, v):
-        with self._lock:
-            self._value = v
-
+from utils import AtomicInteger
+from utils import AtomicDouble
+import logging
 
 last_run_time = AtomicDouble(time.time())
 conseq_fail_count = AtomicInteger(0)
@@ -76,17 +22,14 @@ success_count = AtomicInteger(0)
 start_time = time.time()
 
 
-# https://finance.yahoo.com/quote/CVNA/history?period1=1493337600&period2=1668297600&interval=1d&filter=history&frequency=1d&includeAdjustedClose=true
 class YahooDriver(object):
     def __init__(self,
                  download_dir: str = "./data/history/",
-                 executable_path: str = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                 executable_path: str = "/usr/local/bin/chromedriver",
                  window_size: str = "2880,1800",
                  user_info: dict = None):
         self.window_size = window_size
-        # "/usr/local/bin/chromedriver" #
-        self.executable_path = "/usr/local/bin/chromedriver"
-        # self.executable_path = executable_path
+        self.executable_path = executable_path
         self.download_dir = download_dir
         self.user_info = user_info
         self.driver = None
@@ -95,10 +38,9 @@ class YahooDriver(object):
     def init_driver(self):
         options = Options()
         user_agent = UserAgent().random
-        print(user_agent)
         options.add_argument(f'user-agent={user_agent}')
-        # options.add_argument("headless")
-        # options.add_argument("--headless")
+        options.add_argument("headless")
+        options.add_argument("--headless")
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument("--window-size=%s" % self.window_size)
@@ -137,7 +79,6 @@ class YahooDriver(object):
         pass_btn.clear()
         pass_btn.send_keys(user_info["password"])
         pass_submit_btn.click()
-        print("LOGIN SUCCESSFUL !!!!")
 
     def _reset(self):
         self.quit()
@@ -167,7 +108,7 @@ class YahooDriver(object):
             except:
                 e = sys.exc_info()[0]
                 e_message = sys.exc_info()[1]
-                print(f"Failed to reset driver with exception: {e} {e_message}")
+                logging.warning(f"Failed to reset driver with exception: {e} {e_message}")
                 traceback.print_exc()
         YahooTickerParser(company, self.driver, self.download_dir).run()
 
@@ -181,31 +122,10 @@ class YahooTickerParser(object):
 
     def run(self):
         company = self.company
-        if company['type'] == 'ETF':
-            print("= Skipping: {}".format(company))
-        else:
-            print("Processing: {}".format(company))
-            ticker = company['symbol']
-            download_dir = self.download_dir
-            YahooTickerSectionParser(ticker, self.driver, "financials", download_dir).run()
-            # YahooTickerSectionParser(ticker, self.driver, "balance-sheet", download_dir).run()
-            # YahooTickerSectionParser(ticker, self.driver, "cash-flow", download_dir).run()
-            # try:
-            #     YahooTickerSectionParser(ticker, self.driver, "financials", download_dir).run()
-            #     YahooTickerSectionParser(ticker, self.driver, "balance-sheet", download_dir).run()
-            #     YahooTickerSectionParser(ticker, self.driver, "cash-flow", download_dir).run()
-            # except KeyboardInterrupt:
-            #     raise KeyboardInterrupt
-            # except:  # catch *all* exceptions
-            #     e = sys.exc_info()[0]
-            #     e_message = sys.exc_info()[1]
-            #     e_stacktrace = sys.exc_info()[2]
-            #     print(f"****** Exception occured for {ticker},exception: {e} {e_message}")
-            #     traceback.print_exc()
-            #     fail_count.inc()
-            #     sleep_time = min(fail_count.value * 20, 30 * 60)
-            #     print(f"Going to sleep for {sleep_time} seconds {fail_count}")
-            #     time.sleep(sleep_time)
+        logging.info("Processing: {}".format(company))
+        ticker = company['symbol']
+        download_dir = self.download_dir
+        YahooTickerSectionParser(ticker, self.driver, "financials", download_dir).run()
 
 
 class YahooTickerSectionParser(object):
@@ -226,12 +146,12 @@ class YahooTickerSectionParser(object):
             e = sys.exc_info()[0]
             e_message = sys.exc_info()[1]
             e_stacktrace = sys.exc_info()[2]
-            print(f"****** Exception occured for {self.ticker} on {self.section},exception: {e} {e_message}")
+            logging.warning(f"****** Exception occured for {self.ticker} on {self.section},exception: {e} {e_message}")
             traceback.print_exc()
             conseq_fail_count.inc()
             fail_count.inc()
             sleep_time = min(conseq_fail_count.value * 5, 5 * 60)
-            print(f"Going to sleep for {sleep_time} seconds {conseq_fail_count}. "
+            logging.info(f"Going to sleep for {sleep_time} seconds {conseq_fail_count}. "
                   f"Total # of failures {fail_count}")
             time.sleep(sleep_time)
 
@@ -244,10 +164,10 @@ class YahooTickerSectionParser(object):
 
         dest1 = self.__get_download_file_name(self.download_dir, section, REPORT_TYPE_ANNUAL, self.ticker)
         if os.path.isfile(dest1):
-            print(f"Already processed file: {dest1}")
+            logging.info(f"Already processed file: {dest1}")
             return
 
-        print("url: {}".format(url))
+        logging.info("url: {}".format(url))
         # time_passed = time.time() - last_run_time.value
         # if time_passed <= 10:
         #     wait_time = 10 - time_passed
@@ -258,7 +178,7 @@ class YahooTickerSectionParser(object):
         driver.get(url)
         cur_url = driver.current_url
         if cur_url != url:
-            print("URL different {} and {}".format(cur_url, url))
+            logging.info("URL different {} and {}".format(cur_url, url))
         else:
             # 'table', attrs={'data-test': 'historical-prices'
             # aria-label="Close"
@@ -276,7 +196,7 @@ class YahooTickerSectionParser(object):
             # min_wait_time = random.randint(3, 5)
             # if time_passed < min_wait_time:
             #     wait_time = min_wait_time - time_passed
-            #     print(f"Sleep for rate limit (expand btn): {wait_time} seconds")
+            #     logging.info(f"Sleep for rate limit (expand btn): {wait_time} seconds")
             #     time.sleep(wait_time)
             # expand_btn.click()
 
@@ -300,10 +220,10 @@ class YahooTickerSectionParser(object):
             except:
                 e = sys.exc_info()[0]
                 e_message = sys.exc_info()[1]
-                print(f"__download_with_retries failed for {self.ticker} on {self.section},exception: {e} {e_message}")
+                logging.warning(f"__download_with_retries failed for {self.ticker} on {self.section},exception: {e} {e_message}")
                 traceback.print_exc()
                 # toggle twice
-                print(f"Toggling before retry.... cnt={i} {self.ticker} {self.section} {report_type}")
+                # logging.info(f"Toggling before retry.... cnt={i} {self.ticker} {self.section} {report_type}")
                 # self.__toggle_twice(report_type)
                 time.sleep(cur_sleep_sec)
                 cur_sleep_sec = min(cur_sleep_sec * backoff_multiplier, max_sleep_sec)
@@ -318,29 +238,29 @@ class YahooTickerSectionParser(object):
     def __download(self, report_type):
         dest = self.__get_download_file_name(self.download_dir, self.section, report_type, self.ticker)
         if os.path.isfile(dest):
-            print(f"Already processed file: {dest}")
+            logging.info(f"Already processed file: {dest}")
         else:
             column_names = ["Date", "Open", "High", "Low", "Close", "Adj Close", "Volumn"]
-            print(column_names)
+            logging.info(column_names)
                 # self.__get_columns()
             if len(column_names) == 0:
                 raise Exception(f"Not enough columns for {self.ticker} w/ c: {column_names}")
             else:
                 values_matrix, indices_arr = self.__get_table()
-                print(values_matrix)
-                print(indices_arr)
+                logging.info(values_matrix)
+                logging.info(indices_arr)
                 df = pd.DataFrame(values_matrix, columns=column_names, index=indices_arr)
                 pd.set_option('display.max_rows', df.shape[0] + 1)
                 df.to_csv(dest)
                 success_count.inc()
-                print(f"success count: {success_count.value} current time: {time.ctime(time.time())}"
+                logging.info(f"success count: {success_count.value} current time: {time.ctime(time.time())}"
                       f"over {time.time() - start_time} seconds.")
 
     # def __get_columns(self):
     #     driver = self.driver
-    #     soup = BeautifulSoup(driver.page_source, 'html.parser')
+    #     soup = BeautifulSoup(driver.page_source, 'html.scrapper')
     #     if soup is None:
-    #         # print("__get_columns ::: BeautifulSoup(self.driver.page_source, 'html.parser') Empty")
+    #         # print("__get_columns ::: BeautifulSoup(self.driver.page_source, 'html.scrapper') Empty")
     #         return []
     #     section = soup.find('table', attrs={'data-test': 'historical-prices'})
     #     if section is None:
@@ -362,12 +282,12 @@ class YahooTickerSectionParser(object):
 
     def __get_table(self):
         driver = self.driver
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        soup = BeautifulSoup(driver.page_source, 'html.scrapper')
         section = soup.find('table', attrs={'data-test': 'historical-prices'})
-        print(section)
+        logging.info(section)
         main_group = section.find("tbody")
         if main_group is None:
-            print("__get_table ::: main_group Empty")
+            logging.info("__get_table ::: main_group Empty")
             return []
         values_matrix = []
         indices_arr = []
