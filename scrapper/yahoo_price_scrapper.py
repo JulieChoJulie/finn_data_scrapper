@@ -11,6 +11,8 @@ import traceback
 import os
 import time
 import threading
+
+from scrapper.scrapper import SeleniumScrapper
 from utils import AtomicInteger
 from utils import AtomicDouble
 import logging
@@ -22,122 +24,26 @@ success_count = AtomicInteger(0)
 start_time = time.time()
 
 
-class YahooDriver(object):
+class YahooPriceScrapper(SeleniumScrapper):
     def __init__(self,
-                 download_dir: str = "./data/history/",
-                 executable_path: str = "/usr/local/bin/chromedriver",
-                 window_size: str = "2880,1800",
-                 user_info: dict = None):
-        self.window_size = window_size
-        self.executable_path = executable_path
+                 download_dir: str = "./data/history/"):
+        super().__init__()
         self.download_dir = download_dir
-        self.user_info = user_info
-        self.driver = None
-        self.init_driver()
-
-    def init_driver(self):
-        options = Options()
-        user_agent = UserAgent().random
-        options.add_argument(f'user-agent={user_agent}')
-        options.add_argument("headless")
-        options.add_argument("--headless")
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument("--window-size=%s" % self.window_size)
-        self.driver = webdriver.Chrome(self.executable_path, options=options)
-        self.driver.header_overrides = {
-            'Referer': 'https://www.google.com/'
-        }
-
-        self.download_dir = self.download_dir
-        if self.user_info is not None:
-            self._login()
-
-    def quit(self):
-        self.driver.quit()
-
-    # def _login_with_retries(self, num_trials_left=5):
-    #     if num_trials_left == 0:
-    #         self._login()
-    #     else:
-    #         try:
-    #             self._login()
-    #         except:
-    #             self._login_with_retries(num_trials_left - 1)
-    #
-    def _login(self):
-        user_info = self.user_info
-        driver = self.driver
-        driver.get("https://finance.yahoo.com")
-        signin_link_btn = self._with_captcha_retries("//a[@id='header-signin-link']")
-        signin_link_btn.click()
-        user_submit_btn = self._with_captcha_retries("//input[@id='login-signin")
-        driver.find_element_by_xpath("//input[@id='login-username']").send_keys(user_info["username"])
-        user_submit_btn.click()
-        pass_submit_btn = self._with_captcha_retries("//button[@id='login-signin']")
-        pass_btn = driver.find_element_by_xpath("//input[@id='login-passwd']")
-        pass_btn.clear()
-        pass_btn.send_keys(user_info["password"])
-        pass_submit_btn.click()
-
-    def _reset(self):
-        self.quit()
-        self.init_driver()
-
-    def _with_captcha_retries(self, element):
-        for i in range(5):
-            try:
-                return self._load_element(element)
-            except:
-                self._handle_captcha()
 
     def _handle_captcha(self):
-        checkbox = self._load_element("//span[contains(@class, 'recaptcha-checkbox')]")
-        checkbox.click()
-        submit_btn = self._load_element("recaptcha-submit", By.ID)
-        submit_btn.click()
+        # click check box
+        self._click_element("//span[contains(@class, 'recaptcha-checkbox')]")
+        # click recaptcha submit button
+        self._click_element("recaptcha-submit", By.ID)
 
-    def _load_element(self, element, locator_strategy = By.XPATH):
-        return WebDriverWait(self.driver, 30).until(
-            EC.element_to_be_clickable((locator_strategy, element)))
-
-    def process(self, company):
-        if conseq_fail_count.value >= 2:
-            try:
-                self._reset()
-            except:
-                e = sys.exc_info()[0]
-                e_message = sys.exc_info()[1]
-                logging.warning(f"Failed to reset driver with exception: {e} {e_message}")
-                traceback.print_exc()
-        YahooTickerParser(company, self.driver, self.download_dir).run()
-
-
-class YahooTickerParser(object):
-
-    def __init__(self, company, driver, download_dir):
-        self.company = company
-        self.driver = driver
-        self.download_dir = download_dir
-
-    def run(self):
-        company = self.company
+    def run(self, company):
         logging.info("Processing: {}".format(company))
         ticker = company['symbol']
         download_dir = self.download_dir
-        YahooTickerSectionParser(ticker, self.driver, "financials", download_dir).run()
 
-
-class YahooTickerSectionParser(object):
-
-    def __init__(self, ticker, driver, section, download_dir):
+        self.section = "financials"
         self.ticker = ticker
-        self.driver = driver
-        self.section = section
-        self.download_dir = download_dir
 
-    def run(self):
-        # self.download()
         try:
             self.download()
         except KeyboardInterrupt:
@@ -146,7 +52,7 @@ class YahooTickerSectionParser(object):
             e = sys.exc_info()[0]
             e_message = sys.exc_info()[1]
             e_stacktrace = sys.exc_info()[2]
-            logging.warning(f"****** Exception occured for {self.ticker} on {self.section},exception: {e} {e_message}")
+            logging.warning(f"****** Exception occured for {ticker} on {self.section},exception: {e} {e_message}")
             traceback.print_exc()
             conseq_fail_count.inc()
             fail_count.inc()
@@ -201,8 +107,6 @@ class YahooTickerSectionParser(object):
             # expand_btn.click()
 
             self.__download(report_type=REPORT_TYPE_ANNUAL)
-            # self.__toggle(REPORT_TYPE_ANNUAL, cur_page_access_time)
-            # self.__download(report_type=REPORT_TYPE_QUARTERLY)
         conseq_fail_count.value = 0
 
     def __download_with_retries(self, report_type):
@@ -240,13 +144,11 @@ class YahooTickerSectionParser(object):
         if os.path.isfile(dest):
             logging.info(f"Already processed file: {dest}")
         else:
-            column_names = ["Date", "Open", "High", "Low", "Close", "Adj Close", "Volumn"]
-            logging.info(column_names)
-                # self.__get_columns()
+            column_names = self._get_column_names()
             if len(column_names) == 0:
                 raise Exception(f"Not enough columns for {self.ticker} w/ c: {column_names}")
             else:
-                values_matrix, indices_arr = self.__get_table()
+                values_matrix, indices_arr = self._get_rows()
                 logging.info(values_matrix)
                 logging.info(indices_arr)
                 df = pd.DataFrame(values_matrix, columns=column_names, index=indices_arr)
@@ -256,48 +158,43 @@ class YahooTickerSectionParser(object):
                 logging.info(f"success count: {success_count.value} current time: {time.ctime(time.time())}"
                       f"over {time.time() - start_time} seconds.")
 
-    # def __get_columns(self):
-    #     driver = self.driver
-    #     soup = BeautifulSoup(driver.page_source, 'html.scrapper')
-    #     if soup is None:
-    #         # print("__get_columns ::: BeautifulSoup(self.driver.page_source, 'html.scrapper') Empty")
-    #         return []
-    #     section = soup.find('table', attrs={'data-test': 'historical-prices'})
-    #     if section is None:
-    #         # print("__get_columns ::: section Empty")
-    #         return []
-    #     header_group = section.find("div", {"class": "D(tbhg)"})
-    #     if header_group is None:
-    #         # print("__get_columns ::: D(tbhg) Empty")
-    #         return []
-    #     header_row = header_group.find("div", {"class": "D(tbr)"})
-    #     if header_row is None:
-    #         # print("__get_columns ::: D(tbr Empty")
-    #         return []
-    #     columns = header_row.findAll("div", {"class": "Ta(c)"})
-    #     if columns is None:
-    #         # print("__get_columns ::: Ta(c) Empty")
-    #         return []
-    #     return [c.get_text() for c in columns]
-
-    def __get_table(self):
+    def _get_column_names(self):
         driver = self.driver
-        soup = BeautifulSoup(driver.page_source, 'html.scrapper')
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        section = soup.find('table', attrs={'data-test': 'historical-prices'})
+        header_row = section.find("tr")
+        columns = header_row.findAll("th")
+        return [c.get_text() for c in columns]
+
+    def _get_rows(self):
+        driver = self.driver
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
         section = soup.find('table', attrs={'data-test': 'historical-prices'})
         logging.info(section)
         main_group = section.find("tbody")
-        if main_group is None:
-            logging.info("__get_table ::: main_group Empty")
-            return []
         values_matrix = []
-        indices_arr = []
+        indices_arr = None  # price scrapper doesn't need indices
         rows = main_group.findAll("tr")
         for row in rows:
-            # index_name = row.find("div", {"class": "D(tbc)"})
-            # indices_arr.append(index_name.get_text())
             values_dom_arr = row.findAll("td")
             values_matrix.append([d.get_text() for d in values_dom_arr])
-        return values_matrix, None # indices_arr
+        return values_matrix, indices_arr
+
+    def _login(self):
+        user_info = self.user_info
+        driver = self.driver
+        driver.get("https://finance.yahoo.com")
+        signin_link_btn = self._with_captcha_retries("//a[@id='header-signin-link']")
+        signin_link_btn.click()
+        user_submit_btn = self._with_captcha_retries("//input[@id='login-signin")
+        driver.find_element_by_xpath("//input[@id='login-username']").send_keys(user_info["username"])
+        user_submit_btn.click()
+        pass_submit_btn = self._with_captcha_retries("//button[@id='login-signin']")
+        pass_btn = driver.find_element_by_xpath("//input[@id='login-passwd']")
+        pass_btn.clear()
+        pass_btn.send_keys(user_info["password"])
+        pass_submit_btn.click()
+
 
 REPORT_TYPE_ANNUAL = "test"
 MAX_NUM_RETRIES = 5

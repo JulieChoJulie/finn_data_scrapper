@@ -1,1 +1,1 @@
-from .yahoo_scrapper import YahooDriver
+from .yahoo_price_scrapper import YahooPriceScrapper

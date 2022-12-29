@@ -7,7 +7,7 @@ import traceback
 import os
 import scrapper
 import logging
-from scrapper import YahooDriver
+from scrapper import YahooPriceScrapper
 
 with open('data/stock_US.json', 'r') as fp:
     stock_list = [{"currency": "USD", "description": "CARVANA CO", "displaySymbol": "CVNA", "symbol": "CVNA", "type": "EQS"}]
@@ -39,7 +39,7 @@ class Worker(threading.Thread):
 
 
 def run_worker(threadName):
-    driver = YahooDriver()
+    driver = YahooPriceScrapper()
     try:
         # while True:
         while not q.empty():
@@ -49,7 +49,7 @@ def run_worker(threadName):
             try:
                 item = q.get_nowait()
                 logging.info(f"Stock to process: {item}")
-                driver.process(item)
+                driver.run(item)
                 if exitFlag:
                     threadName.exit()
                 end_time = time.time()
@@ -65,7 +65,7 @@ def run_worker(threadName):
                 logging.warning(e_stacktrace)
                 traceback.print_exc()
     finally:
-        driver.quit()
+        driver.shutdown()
 
 
 # Create new threads
