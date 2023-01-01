@@ -12,7 +12,9 @@ class ResultHandler(ABC):
 
 class ResultLogger(ResultHandler):
     def process(self, stock, column_names, rows, indices):
-        pass
+        logging.info(f"stock: ${stock}")
+        logging.info(f"columns:\n{column_names}")
+        logging.info(f"rows:\n{rows}")
 
 
 class ResultFileDownloader(ResultHandler):

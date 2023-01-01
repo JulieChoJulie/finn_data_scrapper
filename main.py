@@ -20,7 +20,9 @@ import time
 global_init_time = time.time()
 q = queue.Queue()
 for stock in stock_list:
-    q.put(stock)
+    task = dict()
+    task['stock'] = stock
+    q.put(task)
 
 print(q.qsize())
 exitFlag = 0
@@ -34,16 +36,16 @@ class Worker(threading.Thread):
 
     def run(self):
         logging.info("Starting " + self.name)
-        run_worker(self.name)
+        scrap(self.name)
         logging.info("Exiting " + self.name)
 
 
-def run_worker(threadName):
-    from result_handler import ResultFileDownloader
-    result_handler = ResultFileDownloader(download_dir="./data/history/", report_type="price")
+def scrap(threadName):
+    from result_handler import ResultFileDownloader,ResultLogger
+    # result_handler = ResultFileDownloader(download_dir="./data/history/", report_type="price")
+    result_handler = ResultLogger()
     driver = YahooPriceScrapper(result_handler)
     try:
-        # while True:
         while not q.empty():
             logging.info(f"Approximate queue size: {q.qsize()}")
             start_time = time.time()
@@ -56,15 +58,14 @@ def run_worker(threadName):
                     threadName.exit()
                 end_time = time.time()
                 logging.info(f"Process time {end_time - start_time}")
-                # time.sleep(0.5)
             except queue.Empty:
                 pass
             except:  # catch *all* exceptions
                 e = sys.exc_info()[0]
                 e_message = sys.exc_info()[1]
                 e_stacktrace = sys.exc_info()[2]
-                logging.warning(f"**** Failed with exception for {item}: {e} {e_message} {e_stacktrace}")
-                logging.warning(e_stacktrace)
+                logging.error(f"**** Failed with exception for {item}: {e} {e_message} {e_stacktrace}")
+                logging.error(e_stacktrace)
                 traceback.print_exc()
     finally:
         driver.shutdown()

@@ -20,7 +20,7 @@ class Scrapper(ABC):
         pass
 
     @abstractmethod
-    def run(self, company):
+    def run(self, task):
         pass
 
     @abstractmethod
