@@ -1,21 +1,17 @@
-import pandas as pd
 from bs4 import BeautifulSoup
-from seleniumwire import webdriver
-from selenium.webdriver.chrome.options import Options
-import sys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from fake_useragent import UserAgent
-import traceback
 import os
 import time
-import threading
 
 from scrapper.scrapper import SeleniumScrapper
+from result_handler import ResultHandler
 from utils import AtomicInteger
 from utils import AtomicDouble
 import logging
+
+logging.basicConfig(level=logging.INFO)
 
 last_run_time = AtomicDouble(time.time())
 conseq_fail_count = AtomicInteger(0)
@@ -26,8 +22,10 @@ start_time = time.time()
 
 class YahooPriceScrapper(SeleniumScrapper):
     def __init__(self,
+                 result_handler: ResultHandler = None,
                  download_dir: str = "./data/history/"):
         super().__init__()
+        self.result_handler: ResultHandler = result_handler
         self.download_dir = download_dir
 
     def _handle_captcha(self):
@@ -44,119 +42,37 @@ class YahooPriceScrapper(SeleniumScrapper):
         self.section = "financials"
         self.ticker = ticker
 
-        try:
-            self.download()
-        except KeyboardInterrupt:
-            raise KeyboardInterrupt
-        except:  # catch *all* exceptions
-            e = sys.exc_info()[0]
-            e_message = sys.exc_info()[1]
-            e_stacktrace = sys.exc_info()[2]
-            logging.warning(f"****** Exception occured for {ticker} on {self.section},exception: {e} {e_message}")
-            traceback.print_exc()
-            conseq_fail_count.inc()
-            fail_count.inc()
-            sleep_time = min(conseq_fail_count.value * 5, 5 * 60)
-            logging.info(f"Going to sleep for {sleep_time} seconds {conseq_fail_count}. "
-                  f"Total # of failures {fail_count}")
-            time.sleep(sleep_time)
-
-    def download(self):
         ticker = self.ticker
         driver = self.driver
         section = self.section
         url = "https://finance.yahoo.com/quote/CVNA/history?period1=1493337600&period2=1668297600&interval=1d&filter=history&frequency=1d&includeAdjustedClose=true"
         # url = f"https://finance.yahoo.com/quote/{ticker}/{section}?p={ticker}"
 
-        dest1 = self.__get_download_file_name(self.download_dir, section, REPORT_TYPE_ANNUAL, self.ticker)
-        if os.path.isfile(dest1):
-            logging.info(f"Already processed file: {dest1}")
-            return
+        # dest1 = self.__get_download_file_name(self.download_dir, section, REPORT_TYPE_ANNUAL, self.ticker)
+        # if os.path.isfile(dest1):
+        #     logging.info(f"Already processed file: {dest1}")
+        #     return
 
         logging.info("url: {}".format(url))
-        # time_passed = time.time() - last_run_time.value
-        # if time_passed <= 10:
-        #     wait_time = 10 - time_passed
-        #     print(f"Sleep for rate limit: {wait_time} seconds")
-        #     time.sleep(wait_time)
         cur_page_access_time = time.time()
         last_run_time.value = cur_page_access_time
         driver.get(url)
         cur_url = driver.current_url
         if cur_url != url:
-            logging.info("URL different {} and {}".format(cur_url, url))
-        else:
-            # 'table', attrs={'data-test': 'historical-prices'
-            # aria-label="Close"
-            WebDriverWait(driver, 20).until(
-                EC.any_of(
-                    EC.visibility_of_element_located((By.XPATH, "//table[contains(@data-test, 'historical-prices')]")),
-                    EC.visibility_of_element_located((By.XPATH, "//button[contains(@aria-label, 'Close')]")),
-                )
+            logging.error("URL different {} and {}".format(cur_url, url))
+            return
+
+        WebDriverWait(driver, 20).until(
+            EC.any_of(
+                EC.visibility_of_element_located((By.XPATH, "//table[contains(@data-test, 'historical-prices')]")),
+                EC.visibility_of_element_located((By.XPATH, "//button[contains(@aria-label, 'Close')]")),
             )
-
-            driver.find_element("xpath", "//button[contains(@aria-label, 'Close')]").click()
-            # expand_btn = WebDriverWait(driver, 20).until(
-            #     EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'expandPf')]")))
-            # time_passed = time.time() - cur_page_access_time
-            # min_wait_time = random.randint(3, 5)
-            # if time_passed < min_wait_time:
-            #     wait_time = min_wait_time - time_passed
-            #     logging.info(f"Sleep for rate limit (expand btn): {wait_time} seconds")
-            #     time.sleep(wait_time)
-            # expand_btn.click()
-
-            self.__download(report_type=REPORT_TYPE_ANNUAL)
+        )
+        driver.find_element("xpath", "//button[contains(@aria-label, 'Close')]").click()
+        rows, indices = self._get_rows()
+        column_names = self._get_column_names()
+        self.result_handler.process(company, column_names, rows, indices)
         conseq_fail_count.value = 0
-
-    def __download_with_retries(self, report_type):
-        i = 0
-        init_sleep_sec = 0.5
-        max_sleep_sec = 180
-        backoff_multiplier = 2
-        cur_sleep_sec = init_sleep_sec
-        while i < MAX_NUM_RETRIES:
-            try:
-                self.__download(report_type)
-                return
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
-            except:
-                e = sys.exc_info()[0]
-                e_message = sys.exc_info()[1]
-                logging.warning(f"__download_with_retries failed for {self.ticker} on {self.section},exception: {e} {e_message}")
-                traceback.print_exc()
-                # toggle twice
-                # logging.info(f"Toggling before retry.... cnt={i} {self.ticker} {self.section} {report_type}")
-                # self.__toggle_twice(report_type)
-                time.sleep(cur_sleep_sec)
-                cur_sleep_sec = min(cur_sleep_sec * backoff_multiplier, max_sleep_sec)
-            i = i + 1
-
-    def __get_download_file_name(self, download_dir, section, report_type, ticker):
-        dest_folder = f'{download_dir}/{ticker[0]}'
-        if not os.path.exists(dest_folder):
-            os.mkdir(dest_folder)
-        return f'{dest_folder}/{section}_{report_type}_{ticker}.csv'
-
-    def __download(self, report_type):
-        dest = self.__get_download_file_name(self.download_dir, self.section, report_type, self.ticker)
-        if os.path.isfile(dest):
-            logging.info(f"Already processed file: {dest}")
-        else:
-            column_names = self._get_column_names()
-            if len(column_names) == 0:
-                raise Exception(f"Not enough columns for {self.ticker} w/ c: {column_names}")
-            else:
-                values_matrix, indices_arr = self._get_rows()
-                logging.info(values_matrix)
-                logging.info(indices_arr)
-                df = pd.DataFrame(values_matrix, columns=column_names, index=indices_arr)
-                pd.set_option('display.max_rows', df.shape[0] + 1)
-                df.to_csv(dest)
-                success_count.inc()
-                logging.info(f"success count: {success_count.value} current time: {time.ctime(time.time())}"
-                      f"over {time.time() - start_time} seconds.")
 
     def _get_column_names(self):
         driver = self.driver

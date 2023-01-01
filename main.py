@@ -39,7 +39,9 @@ class Worker(threading.Thread):
 
 
 def run_worker(threadName):
-    driver = YahooPriceScrapper()
+    from result_handler import ResultFileDownloader
+    result_handler = ResultFileDownloader(download_dir="./data/history/", report_type="price")
+    driver = YahooPriceScrapper(result_handler)
     try:
         # while True:
         while not q.empty():

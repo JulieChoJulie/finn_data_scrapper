@@ -31,7 +31,6 @@ class Scrapper(ABC):
     def _get_column_names(self):
         pass
 
-
     @abstractmethod
     def _get_rows(self):
         pass
