@@ -11,8 +11,6 @@ from utils import AtomicInteger
 from utils import AtomicDouble
 import logging
 
-logging.basicConfig(level=logging.INFO)
-
 last_run_time = AtomicDouble(time.time())
 conseq_fail_count = AtomicInteger(0)
 fail_count = AtomicInteger(0)

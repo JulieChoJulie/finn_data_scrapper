@@ -10,9 +10,11 @@ import logging
 from scrapper import YahooPriceScrapper
 from utils import py_time_to_unix_timestamp
 
-with open('data/stock_US.json', 'r') as fp:
-    stock_list = [{"currency": "USD", "description": "CARVANA CO", "displaySymbol": "CVNA", "symbol": "CVNA", "type": "EQS"}]
-    # json.load(fp)
+logging.getLogger().setLevel(logging.INFO)
+logging.getLogger('seleniumwire').setLevel(logging.WARNING)
+
+with open('data/stock_US_cvna.json', 'r') as fp:
+    stock_list = json.load(fp)
 logging.info("# of symbols: {}".format(len(stock_list)))
 
 import threading, queue
@@ -30,7 +32,6 @@ for stock in stock_list:
     task['start_ts'] = search_start_time
     q.put(task)
 
-print(q.qsize())
 exitFlag = 0
 
 
