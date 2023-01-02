@@ -8,6 +8,7 @@ import os
 import scrapper
 import logging
 from scrapper import YahooPriceScrapper
+from utils import py_time_to_unix_timestamp
 
 with open('data/stock_US.json', 'r') as fp:
     stock_list = [{"currency": "USD", "description": "CARVANA CO", "displaySymbol": "CVNA", "symbol": "CVNA", "type": "EQS"}]
@@ -18,10 +19,15 @@ import threading, queue
 import time
 
 global_init_time = time.time()
+search_end_time = py_time_to_unix_timestamp(time.time())
+search_start_time = py_time_to_unix_timestamp(time.time() - 7 * 24 * 60 * 60)
+
 q = queue.Queue()
 for stock in stock_list:
     task = dict()
     task['stock'] = stock
+    task['end_ts'] = search_end_time
+    task['start_ts'] = search_start_time
     q.put(task)
 
 print(q.qsize())

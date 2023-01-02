@@ -51,3 +51,7 @@ class AtomicDouble(object):
     def value(self, v):
         with self._lock:
             self._value = v
+
+
+def py_time_to_unix_timestamp(py_time: float):
+    return int(py_time)

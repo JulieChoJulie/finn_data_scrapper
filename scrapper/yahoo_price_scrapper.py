@@ -36,8 +36,10 @@ class YahooPriceScrapper(SeleniumScrapper):
         stock = task['stock']
         logging.info("Processing: {}".format(stock))
         ticker = stock['symbol']
+        start_ts = task['start_ts']
+        end_ts = task['end_ts']
         driver = self.driver
-        url = f"https://finance.yahoo.com/quote/{ticker}/history?period1=1493337600&period2=1668297600&interval=1d&filter=history&frequency=1d&includeAdjustedClose=true"
+        url = f"https://finance.yahoo.com/quote/{ticker}/history?period1={start_ts}&period2={end_ts}&interval=1d&filter=history&frequency=1d&includeAdjustedClose=true"
 
         logging.info("url: {}".format(url))
         cur_page_access_time = time.time()
