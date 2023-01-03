@@ -1,6 +1,5 @@
 import pandas as pd
 from selenium import webdriver
-import requests
 import json
 import sys
 import traceback

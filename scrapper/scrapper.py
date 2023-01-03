@@ -4,7 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from seleniumwire import webdriver
+from selenium import webdriver
 
 
 class Scrapper(ABC):
@@ -38,7 +38,7 @@ class Scrapper(ABC):
 
 class SeleniumScrapper(Scrapper):
     def __init__(self,
-                 executable_path: str = "/usr/local/bin/chromedriver",
+                 executable_path: str = "../external/chromedriver",
                  window_size: str = "2880,1800",
                  user_info=None):
         super().__init__(user_info)
@@ -55,7 +55,10 @@ class SeleniumScrapper(Scrapper):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument("--window-size=%s" % self.window_size)
-        driver = webdriver.Chrome(self.executable_path, options=options)
+        chrome_prefs = {}
+        options.experimental_options["prefs"] = chrome_prefs
+        chrome_prefs["profile.default_content_settings"] = {"images": 2}
+        driver = webdriver.Chrome(options=options)
         driver.header_overrides = {
             'Referer': 'https://www.google.com/'
         }
