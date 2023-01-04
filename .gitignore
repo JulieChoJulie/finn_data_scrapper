@@ -2,4 +2,4 @@
 **/*.pyc
 **/.idea/
 **/data
-
+**/secrets/
