@@ -61,8 +61,10 @@ class YahooPriceScrapper(SeleniumScrapper):
                 EC.visibility_of_element_located((By.XPATH, "//button[contains(@aria-label, 'Close')]")),
             )
         )
-        # TODO: only execute click code below when an element exist
-        self.driver.find_element("xpath", "//button[contains(@aria-label, 'Close')]").click()
+        try:
+            self.driver.find_element("xpath", "//button[contains(@aria-label, 'Close')]").click()
+        except:
+            logging.info("Benign; Failed to locate/click an extra window")
 
     def _get_column_names(self):
         driver = self.driver

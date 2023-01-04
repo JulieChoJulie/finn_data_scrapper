@@ -38,11 +38,9 @@ class Scrapper(ABC):
 
 class SeleniumScrapper(Scrapper):
     def __init__(self,
-                 executable_path: str = "../external/chromedriver",
                  window_size: str = "2880,1800",
                  user_info=None):
         super().__init__(user_info)
-        self.executable_path = executable_path
         self.window_size = window_size
         self.driver = self.__init_web_driver()
 
