@@ -47,9 +47,10 @@ class Worker(threading.Thread):
 
 
 def scrap(threadName):
-    from result_handler import ResultFileDownloader,ResultLogger
+    from result_handler import ResultFileDownloader,ResultLogger,MySQLResultHandler
     # result_handler = ResultFileDownloader(download_dir="./data/history/", report_type="price")
-    result_handler = ResultLogger()
+    # result_handler = ResultLogger()
+    result_handler = MySQLResultHandler()
     driver = YahooPriceScrapper(result_handler)
     try:
         while not q.empty():
