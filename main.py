@@ -9,6 +9,10 @@ import logging
 from scrapper import YahooPriceScrapper
 from utils import py_time_to_unix_timestamp
 
+logging.basicConfig(
+    format='%(asctime)s %(levelname)-8s %(name)s: %(message)s %(pathname)s:%(lineno)d in %(funcName)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
 logging.getLogger().setLevel(logging.INFO)
 logging.getLogger('seleniumwire').setLevel(logging.WARNING)
 

@@ -15,6 +15,9 @@ class ResultLogger(ResultHandler):
         logging.info(f"stock: ${stock}")
         logging.info(f"columns:\n{column_names}")
         logging.info(f"rows:\n{rows}")
+        from utils import to_mysql_date
+        db_rows = [[to_mysql_date(r[0])] + r[1:] + ["cvna"] for r in rows]
+        logging.info(f"db_rows:\n{db_rows}")
 
 
 class ResultFileDownloader(ResultHandler):

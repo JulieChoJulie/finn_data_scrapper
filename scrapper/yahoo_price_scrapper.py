@@ -17,7 +17,6 @@ fail_count = AtomicInteger(0)
 success_count = AtomicInteger(0)
 start_time = time.time()
 
-
 class YahooPriceScrapper(SeleniumScrapper):
     def __init__(self,
                  result_handler: ResultHandler = None):
@@ -48,7 +47,9 @@ class YahooPriceScrapper(SeleniumScrapper):
             logging.error(f"URL different {cur_url} and {url}")
             raise Exception(f"Unexpected ERROR: URL different {cur_url} and {url}")
 
+        logging.info("Wait for loading...")
         self.__wait_until_loaded()
+        logging.info("Page loaded")
         rows, indices = self._get_rows()
         column_names = self._get_column_names()
         self.result_handler.process(stock, column_names, rows, indices)

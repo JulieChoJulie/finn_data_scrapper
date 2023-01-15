@@ -1,4 +1,5 @@
 import threading
+import datetime
 
 
 class AtomicInteger(object):
@@ -55,3 +56,6 @@ class AtomicDouble(object):
 
 def py_time_to_unix_timestamp(py_time: float):
     return int(py_time)
+
+def to_mysql_date(date: str, current_format='%b %d, %Y'):
+    return datetime.datetime.strptime(date, current_format).strftime('%Y-%m-%d')

@@ -5,6 +5,7 @@ import glob
 import mysql.connector
 
 from result_handler import ResultHandler
+from utils import to_mysql_date
 
 
 class MySQLResultHandler(ResultHandler):
@@ -17,8 +18,6 @@ class MySQLResultHandler(ResultHandler):
                 password=password
             )
         self.migrate_db()
-        self.execute("CREATE DATABASE IF NOT EXISTS finn")
-        self.execute("USE finn")
 
     def migrate_db(self):
         for filename in sorted(glob.glob('db_migration/*.sql')):
@@ -41,8 +40,21 @@ class MySQLResultHandler(ResultHandler):
             for x in cursor:
                 logging.info(x)
 
-
     def process(self, stock, column_names, rows, indices):
+        symbol = stock['symbol']
         logging.info(f"stock: ${stock}")
         logging.info(f"columns:\n{column_names}")
         logging.info(f"rows:\n{rows}")
+        sql = """
+          INSERT INTO price_history
+            (date, open, high, low, close, adj_close, volumn, ticker)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, CONV(HEX(%s), 16, 10))
+        """
+        cursor = self.conn.cursor()
+        db_rows = [self.to_mysql_row(r, symbol) for r in rows]
+        cursor.executemany(sql, db_rows)
+        self.conn.commit()
+
+    def to_mysql_row(self, row, symbol):
+        volumn = int(row[-1].replace(",", ""))
+        return [to_mysql_date(row[0])] + row[1:-1] + [volumn, symbol]
