@@ -47,8 +47,9 @@ class MySQLResultHandler(ResultHandler):
         logging.info(f"rows:\n{rows}")
         sql = """
           INSERT INTO price_history
-            (date, open, high, low, close, adj_close, volumn, ticker)
+              (date, open, high, low, close, adj_close, volumn, ticker)
             VALUES (%s, %s, %s, %s, %s, %s, %s, CONV(HEX(%s), 16, 10))
+            ON DUPLICATE KEY UPDATE ticker=ticker;
         """
         cursor = self.conn.cursor()
         db_rows = [self.to_mysql_row(r, symbol) for r in rows]
